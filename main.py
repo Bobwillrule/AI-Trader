@@ -94,13 +94,35 @@ def select_model(model_dir="AImodels"):
 def startUp():
     """starts the program, asks if training is needed or not"""
     loop = True
+    loop2 = True
     while loop:
         trainOption = input("Do you want to train the model? (y/n): ").lower()
         if trainOption == "":
             print("No input detected, skipping training.")
             loop = False
+
+        # If user wants to train
         elif trainOption == "y":
             fileName = input("Please Input Your Model Name: ").lower()
+            
+            # Ask if we want to resume or not
+            while loop2:
+                resume = input("Would you like to resume a previous session? (y/n): ").lower()
+                if resume == "":
+                    train(fileName, False)
+                    print("New training.")
+                    loop2 = False
+                elif resume == "y":
+                    train(fileName, True)
+                    print("Continuing training.")
+                    loop2 = False
+                elif resume == "n":
+                    train(fileName, False)
+                    print("New training.")
+                    loop2 = False
+                else:
+                    print(f"Invalid input: '{trainOption}'.")
+
             train(fileName)
             loop = False
         elif trainOption == "n":
@@ -112,13 +134,14 @@ def startUp():
     if (trainOption == "" or trainOption == "n"):
         run(select_model())
     else:
-        run(fileName)
+        model_path = os.path.join("AImodels", f"{fileName}.pth")
+        run(model_path)
         
 
 def run(model):
     # Load policy
     policy = policyNetwork(stateSize=5, actionSize=3)
-    policy.load_state_dict(torch.load("trading_model.pth"))
+    policy.load_state_dict(torch.load(model))
     policy.eval()
 
     # Load the json portfolio values
