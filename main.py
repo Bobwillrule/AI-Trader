@@ -11,7 +11,7 @@ from AI.brain import policyNetwork
 from AI.train import train
 from indicators.RSIIndicators import RSI, StochRSI
 from data.writeOut import WriteOut
-from paperTrade import load_portfolio, paperTrade, save_portfolio
+from data.paperTrade import load_portfolio, paperTrade, save_portfolio
 from indicators.volume import zVolume
 from data.time import WhatTime
 

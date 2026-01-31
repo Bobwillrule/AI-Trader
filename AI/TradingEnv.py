@@ -136,6 +136,10 @@ class TradingEnv:
 
         old_value = self.balance + self.holdingNum * price
 
+        executed_buys = 0
+        executed_sells = 0
+
+
         # ============================
         # 1. HANDLE ILLEGAL ACTIONS
         # ============================

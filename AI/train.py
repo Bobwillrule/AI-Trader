@@ -90,7 +90,7 @@ def load_data(filename, RSI_period=14):
 
 
 def train(fileName = "trading_model", resume=False):
-    df = load_data("BTCUSD-5m-2025-12.csv", RSIPeriod)
+    df = load_data("data/historical_data/BTCUSD-5m-2025-12.csv", RSIPeriod)
 
     env = TradingEnv(df, lotSize=1, startBalance=startMoney)
 
