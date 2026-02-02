@@ -69,6 +69,8 @@ def addWeight(df):
     df = zVolume(df)  # make sure zVolume can accept this argument
 
     score = 0
+    print(rsi_sigmoid(df["rsi"].iloc[-1]/10, 3.3), rsi_sigmoid(df["stoch_rsi"].iloc[-1]/10, 2.3), zVolume_sigmoid(df["zVolume"].iloc[-1]) )
+
     score += rsi_sigmoid(df["rsi"].iloc[-1]/10, 3.3) #add RSI
     score += rsi_sigmoid(df["stoch_rsi"].iloc[-1]/10, 2.3) #add stochRSI
     if (score > 0):
@@ -179,19 +181,26 @@ def evaluation(df, buyThreshold, sellThreshold):
     portfolio = load_portfolio()
 
     if (df["Score"].iloc[-1] >= buyThreshold) and portfolio["position"] == 0: # If score is above threshold
-        paperTrade("BUY", price, lotSize)
+        pnl = paperTrade("BUY", price, lotSize)
         notify_discord(
             f"📈 **BUY SIGNAL**\n"
             f"Price: {df['close'].iloc[-1]:.2f}\n"
-            f"RSI: {df['rsi'].iloc[-1]:.1f}"
+            f"RSI: {df['rsi'].iloc[-1]:.1f}\n"
+            f"Stochastic RSI: {df['stoch_rsi'].iloc[-1]:.1f}\n"
+            f"zVolume: {df['zVolume'].iloc[-1]:.1f}\n"
+            f"Score: {df['Score'].iloc[-1]:.1f}\n"
         )
         WriteOutTrades()
     elif (df["Score"].iloc[-1] <= sellThreshold) and portfolio["position"] >= 1: # If score is below seel threshold
-        paperTrade("SELL", price, lotSize)
+        pnl = paperTrade("SELL", price, lotSize)
         notify_discord(
             f"📈 **Sell SIGNAL**\n"
             f"Price: {df['close'].iloc[-1]:.2f}\n"
             f"RSI: {df['rsi'].iloc[-1]:.1f}"
+            f"Stochastic RSI: {df['stoch_rsi'].iloc[-1]:.1f}\n"
+            f"zVolume: {df['zVolume'].iloc[-1]:.1f}\n"
+            f"Score: {df['Score'].iloc[-1]:.1f}\n"
+            f"PnL: {pnl:.1f}\n"
         )
         WriteOutTrades()
     else: # Hold what you have 
@@ -224,6 +233,6 @@ def ruleBasedRun():
             f"Error: `{type(e).__name__}`\n"
             f"Message: {e}"
         )
-        raise  # optional: re-raise so you still see the traceback
+        raise
     finally:
         notify_discord("⚠️ Bot terminated (manual stop or crash)")
