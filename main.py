@@ -1,6 +1,4 @@
 import pandas as pd
-from baseDirectory.aiBased import AIStartUp, AIrun
-from baseDirectory.ruleBased import ruleBasedRun
 
 def choose():
     """starts the program, asks if training is needed or not"""
@@ -10,10 +8,12 @@ def choose():
         if baseOption == "1":
             print("AI Based Trading bot selected")
             loop = False
+            from baseDirectory.aiBased import AIStartUp, AIrun
             AIStartUp()
             AIrun()
         elif baseOption == "2":
             print("Rule Base Trading bot selected.")
+            from baseDirectory.ruleBased import ruleBasedRun
             loop = False
             ruleBasedRun()
         else:
