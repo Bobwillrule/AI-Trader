@@ -23,27 +23,20 @@ def save_portfolio(portfolio):
         json.dump(portfolio, f, indent=2)
 
 
-def paperTrade(df, buy, lotSize):
-    """Practice trading updating only the last row (no history added)"""
+def paperTrade(action, price, lotSize):
+    portfolio = load_portfolio()
 
-    if buy:
-        # Calculate cost of purchase
-        price = lotSize * df["close"].iloc[-1]
+    if action == "BUY":
+        cost = lotSize * price
+        if portfolio["balance"] >= cost:
+            portfolio["balance"] -= cost
+            portfolio["position"] += lotSize
+            portfolio["num_trades"] += 1
 
-        # Check that we have enough money to buy
-        if price <= df["Balance"].iloc[-1]:
-            # Deduct cost from balance
-            df.loc[df.index[-1], "Balance"] -= price
-            # Add coins to our holdings
-            df.loc[df.index[-1], "Amount"]  += lotSize
+    elif action == "SELL":
+        if portfolio["position"] >= lotSize:
+            portfolio["balance"] += lotSize * price
+            portfolio["position"] -= lotSize
+            portfolio["num_trades"] += 1
 
-    else:
-        # Check that we have enough coins to sell
-        if df["Amount"].iloc[-1] >= lotSize:
-            # Calculate proceeds of sale
-            price = lotSize * df["close"].iloc[-1]
-            # Add money to balance
-            df.loc[df.index[-1], "Balance"] += price
-            # Subtract coins from holdings
-            df.loc[df.index[-1], "Amount"]  -= lotSize
-    return df
+    save_portfolio(portfolio)

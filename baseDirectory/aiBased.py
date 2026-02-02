@@ -60,7 +60,7 @@ def select_model(model_dir="AImodels"):
         print("Invalid selection. Try again.")
 
 
-def startUp():
+def AIStartUp():
     """starts the program, asks if training is needed or not"""
     loop = True
     loop2 = True
@@ -101,13 +101,13 @@ def startUp():
             print(f"Invalid input: '{trainOption}'.")
     
     if (trainOption == "" or trainOption == "n"):
-        run(select_model())
+        AIrun(select_model())
     else:
         model_path = os.path.join("AImodels", f"{fileName}.pth")
-        run(model_path)
+        AIrun(model_path)
         
 
-def run(model):
+def AIrun(model):
     # Load policy
     policy = policyNetwork(stateSize=5, actionSize=3)
     policy.load_state_dict(torch.load(model))
@@ -161,11 +161,6 @@ def run(model):
         portfolio["balance"] = balance
         portfolio["position"] = holdingNum
         save_portfolio(portfolio)
-
-
-if __name__ == "__main__":
-    startUp()
-    run()
 
 
 
