@@ -25,6 +25,8 @@ startMoney = int(os.getenv("INITIALPAPERMONEY"))
 lotSize = float(os.getenv("HOWMANYYOUWANT"))
 buyThreshold = float(os.getenv("BUYTHRESHOLD"))
 sellThreshold = float(os.getenv("SELLTHRESHOLD"))
+notifSellThreshold = float(os.getenv("NOTIFSELLTHRESHOLD"))
+notifBuyThreshold = float(os.getenv("NOTIFBUYTHRESHOLD"))
 
 session =requests.Session() # start the session
 
@@ -69,7 +71,7 @@ def addWeight(df):
     df = zVolume(df)  # make sure zVolume can accept this argument
 
     score = 0
-    print(rsi_sigmoid(df["rsi"].iloc[-1]/10, 3.3), rsi_sigmoid(df["stoch_rsi"].iloc[-1]/10, 2.3), zVolume_sigmoid(df["zVolume"].iloc[-1]) )
+    # print(rsi_sigmoid(df["rsi"].iloc[-1]/10, 3.3), rsi_sigmoid(df["stoch_rsi"].iloc[-1]/10, 2.3), )
 
     score += rsi_sigmoid(df["rsi"].iloc[-1]/10, 3.3) #add RSI
     score += rsi_sigmoid(df["stoch_rsi"].iloc[-1]/10, 2.3) #add stochRSI
@@ -183,18 +185,18 @@ def evaluation(df, buyThreshold, sellThreshold):
     if (df["Score"].iloc[-1] >= buyThreshold) and portfolio["position"] == 0: # If score is above threshold
         pnl = paperTrade("BUY", price, lotSize)
         notify_discord(
-            f"📈 **BUY SIGNAL**\n"
+            f"📈📈📈 **BUY SIGNAL**\n"
             f"Price: {df['close'].iloc[-1]:.2f}\n"
             f"RSI: {df['rsi'].iloc[-1]:.1f}\n"
             f"Stochastic RSI: {df['stoch_rsi'].iloc[-1]:.1f}\n"
             f"zVolume: {df['zVolume'].iloc[-1]:.1f}\n"
             f"Score: {df['Score'].iloc[-1]:.1f}\n"
         )
-        WriteOutTrades()
+        WriteOutTrades(df)
     elif (df["Score"].iloc[-1] <= sellThreshold) and portfolio["position"] >= 1: # If score is below seel threshold
         pnl = paperTrade("SELL", price, lotSize)
         notify_discord(
-            f"📈 **Sell SIGNAL**\n"
+            f"📉📉📉 **Sell SIGNAL**\n"
             f"Price: {df['close'].iloc[-1]:.2f}\n"
             f"RSI: {df['rsi'].iloc[-1]:.1f}"
             f"Stochastic RSI: {df['stoch_rsi'].iloc[-1]:.1f}\n"
@@ -202,7 +204,30 @@ def evaluation(df, buyThreshold, sellThreshold):
             f"Score: {df['Score'].iloc[-1]:.1f}\n"
             f"PnL: {pnl:.1f}\n"
         )
-        WriteOutTrades()
+        WriteOutTrades(df)
+    else: # Hold what you have 
+        df["decision"] = "Hold"
+    return df
+
+def closeToNotifications(df):
+    if (df["Score"].iloc[-1] >= notifBuyThreshold): # If score is above threshold
+        notify_discord(
+            f"📈 Notification BUY SIGNAL\n"
+            f"Price: {df['close'].iloc[-1]:.2f}\n"
+            f"RSI: {df['rsi'].iloc[-1]:.1f}\n"
+            f"Stochastic RSI: {df['stoch_rsi'].iloc[-1]:.1f}\n"
+            f"zVolume: {df['zVolume'].iloc[-1]:.1f}\n"
+            f"Score: {df['Score'].iloc[-1]:.1f}\n"
+        )
+    elif (df["Score"].iloc[-1] <= notifSellThreshold): # If score is below seel threshold
+        notify_discord(
+            f"📉 Notification Sell SIGNAL\n"
+            f"Price: {df['close'].iloc[-1]:.2f}\n"
+            f"RSI: {df['rsi'].iloc[-1]:.1f}"
+            f"Stochastic RSI: {df['stoch_rsi'].iloc[-1]:.1f}\n"
+            f"zVolume: {df['zVolume'].iloc[-1]:.1f}\n"
+            f"Score: {df['Score'].iloc[-1]:.1f}\n"
+        )
     else: # Hold what you have 
         df["decision"] = "Hold"
     return df

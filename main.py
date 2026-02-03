@@ -1,5 +1,7 @@
 import pandas as pd
 
+from backtesting.backTest import backtest_rule_bot
+
 def choose():
     """starts the program, asks if training is needed or not"""
     loop = True
@@ -16,6 +18,10 @@ def choose():
             from baseDirectory.ruleBased import ruleBasedRun
             loop = False
             ruleBasedRun()
+        elif baseOption == "3":
+            print("Back test Rule Trading bot selected.")
+            backtest_rule_bot("data/historical_data/BTCUSD-5m-2025-12.csv")
+            loop = False
         else:
             print(f"Invalid input: '{baseOption}'. Please select 1 or 2")
 
