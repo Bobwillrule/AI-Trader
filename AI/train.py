@@ -5,6 +5,7 @@ import pandas as pd
 import torch
 from AI.TradingEnv import TradingEnv
 from AI.brain import trainDQN
+from indicators.bb import Bollinger
 from indicators.RSIIndicators import RSI, StochRSI
 from indicators.volume import zVolume
 
@@ -15,8 +16,8 @@ pair = os.getenv("PAIR")
 interval = int(os.getenv("INTERVAL")) # in seconds
 candle = os.getenv("CANDLE") # in minutes
 RSIPeriod = int(os.getenv("RSIPERIOD"))
-sellThreshold = int(os.getenv("SELLTHRESHOLD"))
-buyThreshold = int(os.getenv("BUYTHRESHOLD"))
+sellThreshold = float(os.getenv("SELLTHRESHOLD"))
+buyThreshold = float(os.getenv("BUYTHRESHOLD"))
 startMoney = int(os.getenv("INITIALPAPERMONEY"))
 lotSize = float(os.getenv("HOWMANYYOUWANT"))
 
@@ -43,6 +44,7 @@ def normalizeOHLC(df):
     df["nRSI"] = df["rsi"] / 100
     df["nStochRSI"] = df["stoch_rsi"] / 100
     df["nZVolume"] = df["zVolume"] / 3
+    df = df.dropna().reset_index(drop=True)
     
     return df
 
@@ -80,6 +82,8 @@ def load_data(filename, RSI_period=14):
     # Add normalized volume (zVolume) — use base volume column
     df = zVolume(df)  # make sure zVolume can accept this argument
 
+    df = Bollinger(df)
+
     # Normalize OHLC + indicators for DQN
     df = normalizeOHLC(df)
 
@@ -92,9 +96,9 @@ def load_data(filename, RSI_period=14):
 def train(fileName = "trading_model", resume=False):
     df = load_data("data/historical_data/BTCUSD-5m-2025-12.csv", RSIPeriod)
 
-    env = TradingEnv(df, lotSize=1, startBalance=startMoney)
+    env = TradingEnv(df, startBalance=startMoney)
 
-    policy = trainDQN(env, episodes = 4000, gamma=0.95, lr=1e-3, epsilon=0.1, stateSize = 9, actionSize = 3, resume=resume)
+    policy = trainDQN(env, episodes = 2715, gamma=0.95, lr=1e-3, epsilon=0.1, stateSize = 12, actionSize = 3, resume=resume)
 
     model_path = os.path.join("AImodels", f"{fileName}.pth")
     torch.save(policy.state_dict(), model_path)

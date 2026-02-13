@@ -1,12 +1,14 @@
+import math
 import numpy as np
 
 class TradingEnv:
     """Simulates trading of the bot using the most recent rows of data."""
 
-    def __init__(self, df, lotSize=0.001, startBalance=1000, window=6000):
+    def __init__(self, df, lotSize=0.001, startBalance=1000, window=6000, fee = 0.004):
         # Keep only the last 'window' rows
         self.df = df.tail(window).reset_index(drop=True)
         self.lotSize = lotSize
+        self.fee = fee
         self.startBalance = startBalance
         self.reset()
 
@@ -29,6 +31,10 @@ class TradingEnv:
             row["nRSI"],                    # 0-100
             row["nStochRSI"],              # 0-100
             row["nZVolume"],                # roughly ~[-3,3]
+            row["bb_pos"],        # 0-1
+            row["bb_width"],      # volatility
+            row["bb_dist_mid"],   # mean reversion
+
             self.holdingNum / self.lotSize, # fraction of max lot held (0-1)
             self.balance / self.startBalance # normalized balance (0-1)
         ], dtype=np.float32)
@@ -130,72 +136,129 @@ class TradingEnv:
     #     return self._getState(), reward, self.done
 
 
+    # def step(self, action):
+    #     row = self.df.iloc[self.t]
+    #     price = row["close"]
+
+    #     old_value = self.balance + self.holdingNum * price
+
+    #     executed_buys = 0
+    #     executed_sells = 0
+
+
+    #     # ============================
+    #     # 1. HANDLE ILLEGAL ACTIONS
+    #     # ============================
+    #     if action == 1 and self.holdingNum > 0:
+    #         # Buy while already holding → penalty, NO time advance
+    #         return self._getState(), -5.0, self.done
+
+    #     if action == 2 and self.holdingNum == 0:
+    #         # Sell while holding nothing → penalty, NO time advance
+    #         return self._getState(), -5.0, self.done
+        
+
+    #     # ============================
+    #     # 2. EXECUTE VALID ACTION
+    #     # ============================
+    #     action_penalty = 0.0
+
+    #     if action == 1:  # BUY
+    #         cost = price * self.lotSize
+    #         fee_cost = cost * self.fee
+    #         total_cost = cost + fee_cost
+
+    #         if self.balance >= total_cost:
+    #             self.balance -= total_cost
+    #             self.holdingNum = self.lotSize
+    #             action_penalty = -0.05  # optional small friction
+
+    #     elif action == 2:  # SELL
+    #         revenue = price * self.lotSize
+    #         fee_cost = revenue * self.fee
+    #         net_revenue = revenue - fee_cost
+
+    #         self.balance += net_revenue
+    #         self.holdingNum = 0
+    #         action_penalty = -0.05
+
+    #     # action == 0 → HOLD (no changes)
+
+    #     # ============================
+    #     # 3. ADVANCE TIME (ONLY HERE)
+    #     # ============================
+    #     self.t += 1
+    #     self.done = self.t >= len(self.df) - 1
+
+    #     if self.done:
+    #         return self._getState(), 0.0, self.done
+
+    #     # ============================
+    #     # 4. REWARD CALCULATION
+    #     # ============================
+    #     new_price = self.df.iloc[self.t]["close"]
+    #     new_value = self.balance + self.holdingNum * new_price
+
+    #     # Portfolio percentage change
+    #     reward = ((new_value - old_value) / old_value) * 1000
+    #     reward += action_penalty
+
+    #     # ============================
+    #     # 5. SMALL HOLD BONUS (OPTIONAL)
+    #     # ============================
+    #     if action == 0 and self.holdingNum == 0:
+    #         price_change = ((new_price - price) / price) * 1000
+    #         reward += -price_change * 0.02 if price_change > 0 else abs(price_change) * 0.01
+
+    #     return self._getState(), reward, self.done
+
     def step(self, action):
-        row = self.df.iloc[self.t]
-        price = row["close"]
+            row = self.df.iloc[self.t]
+            price = row["close"]
+            old_value = self.balance + self.holdingNum * price
 
-        old_value = self.balance + self.holdingNum * price
+            reward = 0.0
+            
+            # 1. ACTION LOGIC WITH TRAPPING
+            if action == 1: # BUY
+                if self.holdingNum == 0:
+                    cost = price * self.lotSize
+                    total_cost = cost * (1 + self.fee)
+                    if self.balance >= total_cost:
+                        self.balance -= total_cost
+                        self.holdingNum = self.lotSize
+                    else:
+                        reward = -0.0002 # Penalty for being broke
+                else:
+                    reward = -0.0002 # Penalty for double buying
 
-        executed_buys = 0
-        executed_sells = 0
+            elif action == 2: # SELL
+                if self.holdingNum > 0:
+                    revenue = price * self.lotSize
+                    net_revenue = revenue * (1 - self.fee)
+                    self.balance += net_revenue
+                    self.holdingNum = 0
+                else:
+                    reward = -0.0002 # Penalty for selling air
+
+            # 2. ADVANCE TIME
+            self.t += 1
+            self.done = self.t >= len(self.df) - 1
+            if self.done:
+                return self._getState(), reward, self.done
+
+            # 3. CALCULATE PNL REWARD
+            new_price = self.df.iloc[self.t]["close"]
+            new_value = self.balance + self.holdingNum * new_price
+            
+            # Log return of total portfolio value
+            pnl_reward = math.log(new_value / old_value)
+            reward += pnl_reward
 
 
-        # ============================
-        # 1. HANDLE ILLEGAL ACTIONS
-        # ============================
-        if action == 1 and self.holdingNum > 0:
-            # Buy while already holding → penalty, NO time advance
-            return self._getState(), -5.0, self.done
 
-        if action == 2 and self.holdingNum == 0:
-            # Sell while holding nothing → penalty, NO time advance
-            return self._getState(), -5.0, self.done
+            return self._getState(), reward, self.done
 
-        # ============================
-        # 2. EXECUTE VALID ACTION
-        # ============================
-        action_penalty = 0.0
-
-        if action == 1:  # BUY
-            if self.balance >= price * self.lotSize:
-                self.balance -= price * self.lotSize
-                self.holdingNum = self.lotSize
-                action_penalty = -0.1
-
-        elif action == 2:  # SELL
-            self.balance += price * self.lotSize
-            self.holdingNum = 0
-            action_penalty = -0.1
-
-        # action == 0 → HOLD (no changes)
-
-        # ============================
-        # 3. ADVANCE TIME (ONLY HERE)
-        # ============================
-        self.t += 1
-        self.done = self.t >= len(self.df) - 1
-
-        if self.done:
-            return self._getState(), 0.0, self.done
-
-        # ============================
-        # 4. REWARD CALCULATION
-        # ============================
-        new_price = self.df.iloc[self.t]["close"]
-        new_value = self.balance + self.holdingNum * new_price
-
-        # Portfolio percentage change
-        reward = ((new_value - old_value) / old_value) * 1000
-        reward += action_penalty
-
-        # ============================
-        # 5. SMALL HOLD BONUS (OPTIONAL)
-        # ============================
-        if action == 0 and self.holdingNum == 0:
-            price_change = ((new_price - price) / price) * 1000
-            reward += -price_change * 0.02 if price_change > 0 else abs(price_change) * 0.01
-
-        return self._getState(), reward, self.done
 
     def _advance_with_penalty(self, penalty_value):
         """Helper to penalize illegal moves and move time forward"""

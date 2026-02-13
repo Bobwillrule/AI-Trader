@@ -10,6 +10,7 @@ import torch
 
 from AI.brain import policyNetwork
 from AI.train import train
+from indicators.bb import Bollinger
 from indicators.RSIIndicators import RSI, StochRSI
 from data.writeOut import WriteOut
 from data.paperTrade import load_portfolio, paperTrade, save_portfolio
@@ -29,16 +30,61 @@ session =requests.Session() # start the session
 CANDLE_SECONDS = int(candle) * 60
 
 
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1467265319876690010/jLkgDBcsRVklEb5zgGdnNWkXJSTvA8Fgr9bsU91NYkvPGpu8ks39mx77NNQmmCERKN_M"
+
+def notify_discord(message):
+    try:
+        payload = {
+            "content": message
+        }
+        requests.post(DISCORD_WEBHOOK, json=payload)
+    except Exception:
+        pass
+
+
+
+def normalizeOHLC(df):
+    #  convert to numeric first
+    for col in ["open", "high", "low", "close"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    prev_close = df["close"].shift(1)
+
+    df['nOpen']  = ((df['open'] - prev_close) / prev_close).clip(-1, 1)
+    df['nHigh']  = ((df['high'] - prev_close) / prev_close).clip(-1, 1)
+    df['nLow']   = ((df['low'] - prev_close) / prev_close).clip(-1, 1)
+    df['nClose'] = ((df['close'] - prev_close) / prev_close).clip(-1, 1)
+
+    df["nRSI"] = df["rsi"] / 100
+    df["nStochRSI"] = df["stoch_rsi"] / 100
+    df["nZVolume"] = df["zVolume"] / 3
+
+    # remove NaNs from shift / coercion
+    df = df.dropna().reset_index(drop=True)
+
+    return df
+
+
+
 # Order: [RSI, stochRSI, z_volume, holdingNum, balance]
-def extract_state(df, holdingNum=0, balance=1000):
+def extract_state(df, holdingNum=0, balance=1000, lotSize=1, startBalance=1000):
     last = df.iloc[-1]
+
     return torch.tensor([
-        last["rsi"],         # or RSI column from your indicators
-        last["stoch_rsi"],   # StochRSI column
-        last["zVolume"],      # normalized volume
-        holdingNum,          # current holding number
-        balance              # current balance
+        last["nOpen"],
+        last["nHigh"],
+        last["nLow"],
+        last["nClose"],
+        last["nRSI"],
+        last["nStochRSI"],
+        last["nZVolume"],
+        last["bb_pos"],
+        last["bb_width"],
+        last["bb_dist_mid"],
+        holdingNum / lotSize,        # normalized position (0–1)
+        balance / startBalance       # normalized balance (0–1)
     ], dtype=torch.float32)
+
 
 
 def select_model(model_dir="AImodels"):
@@ -109,58 +155,68 @@ def AIStartUp():
         
 
 def AIrun(model):
-    # Load policy
-    policy = policyNetwork(stateSize=5, actionSize=3)
+    policy = policyNetwork(stateSize=12, actionSize=3)
     policy.load_state_dict(torch.load(model))
     policy.eval()
 
-    # Load the json portfolio values
     portfolio = load_portfolio(startMoney)
     balance = portfolio["balance"]
     holdingNum = portfolio["position"]
 
-    #Main Loop
     while True:
         sleep_until_next_candle()
 
-        #Get Data from kraken
         df = GetCandle(pair, candle, session)
         df["timeStamp"] = WhatTime()
 
-        # compute indicators (assuming your RSIIndicators module does this)
         df["rsi"] = RSI(df["close"], RSIPeriod)
         df["stoch_rsi"] = StochRSI(df["rsi"])
         df = zVolume(df)
+        df = Bollinger(df)
+        df = normalizeOHLC(df)
+        df.loc[df.index[-1], "Score"] = 0
 
-        # Extract state
         state = extract_state(df, holdingNum, balance)
 
-        # Decide action
         with torch.no_grad():
             qvals = policy(state)
             action = torch.argmax(qvals).item()
 
-        # Execute trade
         price = df.iloc[-1]["close"]
+
+        # === EXECUTE TRADE USING NEW PAPERTRADE ===
+        trade_pnl = 0
         if action == 1:
-            paperTrade.buy(price)
-            holdingNum += lotSize
-            balance -= price * lotSize
-            portfolio["num_trades"] += 1
-            
+            trade_pnl = paperTrade("BUY", price, lotSize)
+            notify_discord(
+                f"📈📈📈 **BUY SIGNAL**\n"
+                f"Price: {df['close'].iloc[-1]:.2f}\n"
+                f"RSI: {df['rsi'].iloc[-1]:.1f}\n"
+                f"Stochastic RSI: {df['stoch_rsi'].iloc[-1]:.1f}\n"
+                f"zVolume: {df['zVolume'].iloc[-1]:.1f}\n"
+                f"Score: {df['Score'].iloc[-1]:.1f}\n"
+            )
         elif action == 2:
-            paperTrade.sell(price)
-            holdingNum -= lotSize
-            balance += price * lotSize
-            portfolio["num_trades"] += 1
-            
+            trade_pnl = paperTrade("SELL", price, lotSize)
+            notify_discord(
+                f"📉📉📉 **Sell SIGNAL**\n"
+                f"Price: {df['close'].iloc[-1]:.2f}\n"
+                f"RSI: {df['rsi'].iloc[-1]:.1f}"
+                f"Stochastic RSI: {df['stoch_rsi'].iloc[-1]:.1f}\n"
+                f"zVolume: {df['zVolume'].iloc[-1]:.1f}\n"
+                f"Score: {df['Score'].iloc[-1]:.1f}\n"
+                f"PnL: {trade_pnl:.1f}\n"
+            )
+
+        # === RELOAD UPDATED PORTFOLIO ===
+        portfolio = load_portfolio(startMoney)
+        balance = portfolio["balance"]
+        holdingNum = portfolio["position"]
 
         # Save results
         df["Balance"] = balance
         WriteOut(df)
 
-        portfolio["balance"] = balance
-        portfolio["position"] = holdingNum
         save_portfolio(portfolio)
 
 

@@ -1,0 +1,140 @@
+    # def step(self, action):
+    #     """
+    #     Executes a trade action
+    #     action: 0=hold, 1=buy, 2=sell
+    #     """
+    #     row = self.df.iloc[self.t]
+    #     price = row["close"]
+    #     oldValue = self.balance + price * self.holdingNum
+
+    #     # Enforce only full lot trades
+    #     self.holding = self.holdingNum > 0
+
+    #     # Buy
+    #     if action == 1 and not self.holding and self.balance >= price * self.lotSize:
+    #         self.balance -= price * self.lotSize
+    #         self.holdingNum += self.lotSize
+
+    #     # Sell
+    #     elif action == 2 and self.holding:
+    #         self.balance += price * self.lotSize
+    #         self.holdingNum -= self.lotSize
+    #     # Move to next candle
+    #     self.t += 1
+
+    #     # Check if done
+    #     # Check if done
+    #     if self.t >= len(self.df):
+    #         self.done = True
+    #         last_row = self.df.iloc[-1]
+    #         return np.array([
+    #             last_row["nOpen"],
+    #             last_row["nHigh"],
+    #             last_row["nLow"],
+    #             last_row["nClose"],
+    #             last_row["nRSI"],
+    #             last_row["nStochRSI"],
+    #             last_row["nZVolume"],
+    #             self.holdingNum / self.lotSize,
+    #             self.balance / self.startBalance
+    #         ], dtype=np.float32), 0.0, self.done
+
+    #     # Compute reward
+    #     newPrice = self.df.iloc[self.t]["close"]
+    #     newValue = self.balance + newPrice * self.holdingNum
+
+    #     portfolio_change = (newValue - oldValue) / oldValue 
+
+    #     # Scale it so 1% gain = 1.0 reward
+    #     # This is usually the 'Sweet Spot' for DQN stability
+    #     reward = portfolio_change * 100
+
+    #     return self._getState(), reward, self.done
+
+    # def step(self, action):
+    #     row = self.df.iloc[self.t]
+    #     price = row["close"]
+        
+    #     # Calculate current total value BEFORE the action
+    #     oldValue = self.balance + (price * self.holdingNum)
+
+    #     # 1. Execute Actions
+    #     if action == 1: # Buy
+    #         if self.holdingNum == 0 and self.balance >= price * self.lotSize:
+    #             self.balance -= price * self.lotSize
+    #             self.holdingNum = self.lotSize
+    #     elif action == 2: # Sell
+    #         if self.holdingNum > 0:
+    #             self.balance += price * self.lotSize
+    #             self.holdingNum = 0
+
+    #     # 2. Advance time
+    #     self.t += 1
+        
+    #     # 3. Check if we hit the end of the data
+    #     if self.t >= len(self.df) - 1:
+    #         self.done = True
+        
+    #     # 4. Calculate NEW total value AFTER the price move
+    #     newPrice = self.df.iloc[self.t]["close"]
+    #     newValue = self.balance + (newPrice * self.holdingNum)
+        
+    #     # 5. Reward Calculation (The Sweet Spot)
+    #     # Use percentage change so it's scale-independent
+    #     # We multiply by 100 so 1% gain = 1.0 reward. 
+    #     # Deep learning models LOVE values between -1 and 1.
+    #     reward = ((newValue - oldValue) / oldValue) * 100
+        
+    #     # OPTIONAL: Penalty for being "lazy" (doing nothing)
+    #     # 6. Smarter Lazy Logic
+    #     if self.holdingNum == 0:
+    #         # Calculate what the profit WOULD have been if we bought
+    #         price_change = ((newPrice - price) / price) * 100
+            
+    #         if price_change > 0:
+    #             # Price went up and we missed it! Penalty based on missed gain.
+    #             # We use a small multiplier (0.1) so it doesn't overwhelm the actual trades.
+    #             reward = -price_change * 0.1
+    #         else:
+    #             # Price went down and we didn't own it? Good job! 
+    #             # Give a tiny "pat on the back" for avoiding a loss.
+    #             reward = abs(price_change) * 0.05
+
+    #     return self._getState(), reward, self.done
+
+    # def step(self, action):
+    #     row = self.df.iloc[self.t]
+    #     price = row["close"]
+    #     oldValue = self.balance + (price * self.holdingNum)
+
+    #     # 1. Logic to handle "Illegal" buys
+    #     if action == 1: # Buy
+    #         if self.holdingNum == 0 and self.balance >= price * self.lotSize:
+    #             self.balance -= price * self.lotSize
+    #             self.holdingNum = self.lotSize
+    #         elif self.holdingNum == 0:
+    #             # Penalty for trying to buy with no money
+    #             self.t += 1
+    #             self.done = self.t >= len(self.df) - 1
+    #             return self._getState(), -2.0, self.done 
+
+    #     elif action == 2: # Sell
+    #         if self.holdingNum > 0:
+    #             self.balance += price * self.lotSize
+    #             self.holdingNum = 0
+
+    #     self.t += 1
+    #     self.done = self.t >= len(self.df) - 1
+        
+    #     newPrice = self.df.iloc[self.t]["close"]
+    #     newValue = self.balance + (newPrice * self.holdingNum)
+        
+    #     # Multiply by 1000 so a 0.1% move = 1.0 Reward point
+    #     reward = ((newValue - oldValue) / oldValue) * 1000
+        
+    #     # Lazy logic
+    #     if self.holdingNum == 0 and action == 0:
+    #         price_change = ((newPrice - price) / price) * 1000
+    #         reward = -price_change * 0.2 if price_change > 0 else abs(price_change) * 0.1
+                
+    #     return self._getState(), reward, self.done

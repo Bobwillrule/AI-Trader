@@ -17,7 +17,7 @@ def PublicInfo(linkEnd, pair, candle, session):
     data = response.json() # make the json into a map
 
     candles = data["result"].get(pair)
-    if candles is None:
+    if candles is None:      
         raise ValueError(f"No OHLC data found for pair '{pair}'") # if get returns none
     return candles
 

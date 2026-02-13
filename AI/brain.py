@@ -52,7 +52,7 @@ def trainDQN(env, episodes=4000, gamma=0.95, epsilon = 0.01, lr=1e-3, stateSize=
     checkpoint_path = "AImodels/trading_checkpoint.pth"
     start_episode = 0 
     epsilon = 1.0
-    epsilon_decay = 0.995
+    epsilon_decay = 0.999
     epsilon_min = 0.01
 
     # Loads half trained model if we want
@@ -87,6 +87,7 @@ def trainDQN(env, episodes=4000, gamma=0.95, epsilon = 0.01, lr=1e-3, stateSize=
             action_counts[action] += 1
 
             next_state, reward, done = env.step(action)
+
             memory.push(state, action, reward, next_state, done)
             
             
@@ -129,10 +130,19 @@ def trainDQN(env, episodes=4000, gamma=0.95, epsilon = 0.01, lr=1e-3, stateSize=
                 'epsilon': epsilon,
             }, checkpoint_path)
             print(f"--- Checkpoint saved at episode {episode+1} ---")
+
+
+        final_price = env.df.iloc[env.t-1]["close"]
+        final_value = env.balance + env.holdingNum * final_price
+        profit = final_value - env.startBalance
+        profit_pct = (profit / env.startBalance) * 100
+
+        # ===== Console Output =====
+        print(f"Episode {episode+1}")
+        print(f"   Total Reward: {totalReward:.6f} | Epsilon: {epsilon:.2f}")
+        print(f"   Final Portfolio: ${final_value:.2f}  |  Profit: ${profit:.2f} ({profit_pct:.2f}%)")
+        print(f"   Actions -> Hold: {action_counts[0]}, Buy: {action_counts[1]}, Sell: {action_counts[2]}")
             
-        #Print data to console for tracking
-        print(f"Episode {episode+1}, Total Reward: {totalReward:.2f}, Epsilon: {epsilon:.2f}")
-        print(f"   ↳ Actions -> Hold: {action_counts[0]}, Buy: {action_counts[1]}, Sell: {action_counts[2]}")
 
 
 
