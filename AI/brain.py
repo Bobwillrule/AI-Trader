@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 import torch
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # detect the if we are using cuda
 print("Using device:", device)
 
 # main brain
@@ -16,19 +16,19 @@ class policyNetwork(nn.Module):
     def __init__(self, stateSize, actionSize):
         super().__init__()
         self.layer = nn.Sequential(
-            nn.Linear(stateSize, 128),   # Input layer  wide to capture feature combos
+            nn.Linear(stateSize, 128),   # Input layer  
             nn.ReLU(),
-            nn.Linear(128, 128),         # Hidden layer  learn complex patterns
+            nn.Linear(128, 128),         # Hidden layer
             nn.ReLU(),
-            nn.Linear(128, 64),          # Hidden layer  compress patterns
+            nn.Linear(128, 64),          # Hidden layer 
             nn.ReLU(),
-            nn.Linear(64, 32),           # Extra hidden layer  fine-grain compression
+            nn.Linear(64, 32),           # Extra hidden layer
             nn.ReLU(),
-            nn.Linear(32, actionSize)    # Output layer  Q-values for actions
+            nn.Linear(32, actionSize)    # Output layer
         )
 
     def forward(self, x):
-        return self.layer(x)
+        return self.layer(x) #go trhrough the layers
     
 
 
@@ -36,6 +36,9 @@ import random
 from collections import deque
 
 class ReplayBuffer:
+    """
+    A replay buffer for memorizing states
+    """
     def __init__(self, capacity=10000):
         self.memory = deque(maxlen=capacity)
     def push(self, *args): self.memory.append(args)
@@ -43,6 +46,11 @@ class ReplayBuffer:
     def __len__(self): return len(self.memory)
 
 def trainDQN(env, episodes=4000, gamma=0.95, epsilon = 0.01, lr=1e-3, stateSize=9, actionSize=3, resume = False):
+    """
+    Trains the policy and DQN of the model
+    """
+
+
     policy = policyNetwork(stateSize, actionSize).to(device)
     optimizer = optim.Adam(policy.parameters(), lr=lr)
     lossFunc = nn.MSELoss()
@@ -98,8 +106,7 @@ def trainDQN(env, episodes=4000, gamma=0.95, epsilon = 0.01, lr=1e-3, stateSize=
             if len(memory) > batch_size:
                 transitions = memory.sample(batch_size)
                 
-                # 1. Convert lists to single numpy arrays FIRST (This fixes the warning)
-                # 2. Then convert those numpy arrays to torch tensors
+                #Put to tensor to cuda
                 b_states = torch.tensor(np.array([t[0] for t in transitions]), dtype=torch.float32).to(device)
                 b_actions = torch.tensor([t[1] for t in transitions]).long().to(device)
                 b_rewards = torch.tensor([t[2] for t in transitions], dtype=torch.float32).to(device)
@@ -120,8 +127,10 @@ def trainDQN(env, episodes=4000, gamma=0.95, epsilon = 0.01, lr=1e-3, stateSize=
                 loss.backward()
                 optimizer.step()
 
+        # Update epsilon value
         if epsilon > epsilon_min: epsilon *= epsilon_decay
 
+        # Save the model every 15 episodes
         if (episode + 1) % 15 == 0:
             torch.save({
                 'episode': episode + 1,
@@ -132,6 +141,7 @@ def trainDQN(env, episodes=4000, gamma=0.95, epsilon = 0.01, lr=1e-3, stateSize=
             print(f"--- Checkpoint saved at episode {episode+1} ---")
 
 
+        # Calculate values to print to counsole
         final_price = env.df.iloc[env.t-1]["close"]
         final_value = env.balance + env.holdingNum * final_price
         profit = final_value - env.startBalance
@@ -147,52 +157,3 @@ def trainDQN(env, episodes=4000, gamma=0.95, epsilon = 0.01, lr=1e-3, stateSize=
 
 
     return policy
-    
-    
-# def trainDQN(env, episodes = 1000, gamma=0.95, lr=1e-3, epsilon=0.1, stateSize = 5, actionSize = 3):
-#     """trains the AI using reinforcement learning"""
-#     policy = policyNetwork(stateSize, actionSize).to(device)
-#     optimizer = optim.Adam(policy.parameters(), lr=lr)
-#     lossFunc = nn.MSELoss()
-    
-
-#     epsilon = 1.0        # Start 100% random
-#     epsilon_min = 0.01   # End 1% random
-#     epsilon_decay = 0.995 # Multiply epsilon by this every episode
-
-#     for episode in range(episodes):
-#         state = torch.tensor(env.reset(), dtype=torch.float32).unsqueeze(0).to(device)  # shape [1, stateSize]
-#         totalReward = 0
-
-#         if epsilon > epsilon_min:
-#             epsilon *= epsilon_decay
-
-#         while not env.done:
-#             if np.random.rand() < epsilon:
-#                 action = np.random.randint(actionSize)
-#             else:
-#                 qvals = policy(state)  # shape [1, actionSize]
-#                 action = torch.argmax(qvals).item()
-
-#             nextState, reward, done = env.step(action)
-#             nextState_t = torch.tensor(nextState, dtype=torch.float32).unsqueeze(0).to(device)  # shape [1, stateSize]
-#             totalReward += reward
-
-#             # Compute target
-#             with torch.no_grad():
-#                 qNext = policy(nextState_t)           # [1, actionSize]
-#                 maxQNext = torch.max(qNext, dim=1)[0] # [1]
-#                 target = reward + gamma * maxQNext * (0 if done else 1)  # [1]
-
-#             # Update Q-value
-#             qPrediction = policy(state)[0, action].unsqueeze(0)  # shape [1]
-#             loss = lossFunc(qPrediction, target)
-#             optimizer.zero_grad()
-#             loss.backward()
-#             optimizer.step()
-
-#             state = nextState_t
-
-#         print(f"Episode {episode+1}/{episodes}, Total Reward: {totalReward}")
-
-#     return policy

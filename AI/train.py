@@ -22,14 +22,6 @@ startMoney = int(os.getenv("INITIALPAPERMONEY"))
 lotSize = float(os.getenv("HOWMANYYOUWANT"))
 
 
-# def load_data(filename, RSI_period=14):
-#     df = pd.read_csv(filename)
-#     df = RSI(df, RSI_period)              # add RSI column
-#     df = StochRSI(df, RSI_period)         # add stochastic RSI
-#     df = zVolume(df)              # normalized volume for DQN
-#     df = df.dropna().reset_index(drop=True)
-#     return df
-
 def normalizeOHLC(df):
     """Normalizes OHLC data to between -1, 1 for the best learning for model"""
 
@@ -79,9 +71,8 @@ def load_data(filename, RSI_period=14):
     df["rsi"] = RSI(df["close"], period=RSIPeriod)
     df["stoch_rsi"] = StochRSI(df["rsi"], period=RSIPeriod)
 
-    # Add normalized volume (zVolume) — use base volume column
-    df = zVolume(df)  # make sure zVolume can accept this argument
-
+    # Add normalized volume (zVolume)
+    df = zVolume(df) 
     df = Bollinger(df)
 
     # Normalize OHLC + indicators for DQN
@@ -94,12 +85,19 @@ def load_data(filename, RSI_period=14):
 
 
 def train(fileName = "trading_model", resume=False):
+    """
+    Training entry function
+    """
+
+    # load the data
     df = load_data("data/historical_data/BTCUSD-5m-2025-12.csv", RSIPeriod)
 
-    env = TradingEnv(df, startBalance=startMoney)
+    env = TradingEnv(df, startBalance=startMoney) # create a new environement
 
+    # start training
     policy = trainDQN(env, episodes = 2715, gamma=0.95, lr=1e-3, epsilon=0.1, stateSize = 12, actionSize = 3, resume=resume)
 
+    #save the model
     model_path = os.path.join("AImodels", f"{fileName}.pth")
     torch.save(policy.state_dict(), model_path)
     print(f"Model saved as {model_path}") 

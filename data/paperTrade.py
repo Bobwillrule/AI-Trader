@@ -6,6 +6,7 @@ TAKER_FEE = 0.004   # 0.40%
 
 def load_portfolio(start_balance=1000):
     """loads the portfolio if it exists, if not, create a new one"""
+    # create a new one if it doesnt exist
     if not os.path.exists(PORTFOLIO_FILE):
         portfolio = {
             "balance": start_balance,
@@ -16,6 +17,7 @@ def load_portfolio(start_balance=1000):
         save_portfolio(portfolio)
         return portfolio
 
+    # load the json
     with open(PORTFOLIO_FILE, "r") as f:
         return json.load(f)
 
@@ -25,8 +27,12 @@ def save_portfolio(portfolio):
         json.dump(portfolio, f, indent=2)
 
 def paperTrade(action, price, quantity):
+    """
+    executes a paper trade on the json portfolio
+    """
     portfolio = load_portfolio()
 
+    #------------  Buy-----------
     if action == "BUY" and portfolio["position"] == 0:
         notional = price * quantity
         fee = notional * TAKER_FEE
@@ -40,6 +46,7 @@ def paperTrade(action, price, quantity):
             portfolio["quantity"] = quantity
             portfolio["last_fee"] = fee
 
+    # ---------- Sell------------
     elif action == "SELL" and portfolio["position"] > 0:
         notional = price * portfolio["quantity"]
         fee = notional * TAKER_FEE

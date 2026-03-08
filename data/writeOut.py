@@ -3,8 +3,10 @@ import csv
 def WriteOut(df):
     """Writes out the latest price to CSV file. Writes header only if file does not exist."""
 
+    # Check if file exists
     file_exists = os.path.isfile("data/dataLogs/data_log.csv")
 
+    # open file
     with open("data/dataLogs/data_log.csv", "a", newline="") as csv_file:
         writer = csv.writer(csv_file, delimiter=',')
         
@@ -19,4 +21,5 @@ def WriteOut(df):
                          df["zVolume"].iloc[-1],
                          df["Score"].iloc[-1]])
     
+    #print to console too
     print(f'{df["timeStamp"].iloc[-1]}, {df["close"].iloc[-1]}, {df["rsi"].iloc[-1]:.2f}, {df["stoch_rsi"].iloc[-1]:.2f}, {df["zVolume"].iloc[-1]:.2f}, {df["Score"].iloc[-1]:.2f}')

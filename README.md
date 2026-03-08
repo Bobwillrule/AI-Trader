@@ -46,3 +46,4 @@ bot/
 ├─ main.py             # Main entry point
 └─ BTTUSD_5.csv        # Historical market data
 
+

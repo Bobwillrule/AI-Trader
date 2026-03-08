@@ -6,7 +6,6 @@ import time
 import csv
 import pandas as pd
 
-from indicators.SupportResistance import detect_break_retest, get_nearest_levels, get_rolling_levels
 from data.writeOutTrades import WriteOutTrades
 from indicators.RSIIndicators import RSI, StochRSI
 from data.writeOut import WriteOut
@@ -65,13 +64,15 @@ def zVolume_sigmoid(x):
 
 
 def addWeight(df):
+    """
+    Calculates each indicator and adds it to total score
+    """
     df["rsi"] = RSI(df["close"], period=RSIPeriod)
     df["stoch_rsi"] = StochRSI(df["rsi"], period=RSIPeriod)
     # Add normalized volume (zVolume) — use base volume column
-    df = zVolume(df)  # make sure zVolume can accept this argument
+    df = zVolume(df) 
 
     score = 0
-    # print(rsi_sigmoid(df["rsi"].iloc[-1]/10, 3.3), rsi_sigmoid(df["stoch_rsi"].iloc[-1]/10, 2.3), )
 
     score += rsi_sigmoid(df["rsi"].iloc[-1]/10, 3.3) #add RSI
     score += rsi_sigmoid(df["stoch_rsi"].iloc[-1]/10, 2.3) #add stochRSI
@@ -85,105 +86,17 @@ def addWeight(df):
 
     return df
 
-# def evaluation(df_5m, buyThreshold, sellThreshold):
-#     # ===== Indicator scoring (5m) =====
-#     df_5m = addWeight(df_5m)
-#     price = df_5m.iloc[-1]["close"]
-#     portfolio = load_portfolio()
-
-#     score = df_5m["Score"].iloc[-1]
-
-#     # ===== 1H STRUCTURE (Support / Resistance) =====
-#     df_1h = GetCandle(pair, "60", session)
-
-#     levels_1h = get_rolling_levels(
-#         df_1h.rename(columns={
-#             "high": "High",
-#             "low": "Low",
-#             "close": "Close",
-#             "volume": "Volume"
-#         }),
-#         lookback=120,
-#         window=5,
-#         proximity_pct=0.002,
-#         min_touches=2
-#     )
-
-#     support, resistance = get_nearest_levels(levels_1h, price)
-
-#     # ===== BREAK & RETEST DETECTION (on 5m) =====
-#     bullish_retest = False
-#     bearish_retest = False
-
-#     if resistance is not None:
-#         bullish_retest = detect_break_retest(
-#             df_5m,
-#             resistance["price"],
-#             direction="bull",
-#             lookback=6
-#         )
-
-#     if support is not None:
-#         bearish_retest = detect_break_retest(
-#             df_5m,
-#             support["price"],
-#             direction="bear",
-#             lookback=6
-#         )
-
-#     # ===== SCORE MODULATION =====
-#     if bullish_retest:
-#         score += 1.5
-
-#     if bearish_retest:
-#         score -= 1.5
-
-#     # ===== SAFETY GATES =====
-#     # Do NOT buy directly into resistance
-#     if resistance is not None and score > 0:
-#         if abs(resistance["price"] - price) / price < 0.001:
-#             score = 0
-
-#     # Do NOT sell directly into support
-#     if support is not None and score < 0:
-#         if abs(price - support["price"]) / price < 0.001:
-#             score = 0
-
-#     # ===== EXECUTION =====
-#     if score >= buyThreshold and portfolio["position"] == 0:
-#         paperTrade("BUY", price, lotSize)
-#         notify_discord(
-#             f"📈 **BUY — 1H Break & Retest**\n"
-#             f"Price: {price:.2f}\n"
-#             f"Score: {score:.2f}"
-#         )
-#         WriteOutTrades()
-
-#     elif score <= sellThreshold and portfolio["position"] >= 1:
-#         paperTrade("SELL", price, lotSize)
-#         notify_discord(
-#             f"📉 **SELL — 1H Break & Retest**\n"
-#             f"Price: {price:.2f}\n"
-#             f"Score: {score:.2f}"
-#         )
-#         WriteOutTrades()
-
-#     else:
-#         df_5m.loc[df_5m.index[-1], "decision"] = "Hold"
-
-#     # Store final score for logging
-#     df_5m.loc[df_5m.index[-1], "FinalScore"] = score
-
-#     return df_5m
-
-
 def evaluation(df, buyThreshold, sellThreshold):
-    df = addWeight(df)
+    """
+    evaluates the score and take action against it
+    """
+    df = addWeight(df) # calculate the score
     price = df.iloc[-1]["close"]
-    portfolio = load_portfolio()
+    portfolio = load_portfolio() # loads balance
 
     if (df["Score"].iloc[-1] >= buyThreshold) and portfolio["position"] == 0: # If score is above threshold
-        pnl = paperTrade("BUY", price, lotSize)
+        pnl = paperTrade("BUY", price, lotSize) #buy
+        # Send to discord
         notify_discord(
             f"📈📈📈 **BUY SIGNAL**\n"
             f"Price: {df['close'].iloc[-1]:.2f}\n"
@@ -194,7 +107,8 @@ def evaluation(df, buyThreshold, sellThreshold):
         )
         WriteOutTrades(df)
     elif (df["Score"].iloc[-1] <= sellThreshold) and portfolio["position"] >= 1: # If score is below seel threshold
-        pnl = paperTrade("SELL", price, lotSize)
+        pnl = paperTrade("SELL", price, lotSize) #buy
+        # send to discord
         notify_discord(
             f"📉📉📉 **Sell SIGNAL**\n"
             f"Price: {df['close'].iloc[-1]:.2f}\n"
@@ -210,6 +124,9 @@ def evaluation(df, buyThreshold, sellThreshold):
     return df
 
 def closeToNotifications(df):
+    """
+    notifications to discord if it is almost buy or almost sell
+    """
     if (df["Score"].iloc[-1] >= notifBuyThreshold): # If score is above threshold
         notify_discord(
             f"📈 Notification BUY SIGNAL\n"
@@ -233,12 +150,15 @@ def closeToNotifications(df):
     return df
 
 def ruleBasedRun():
+    """
+    Runs the rule based bot
+    """
     notify_discord("✅ Bot is online!")
 
     # Load the json portfolio values
     portfolio = load_portfolio(startMoney)
     #Main Loop
-    try:
+    try: #try catch to notification when it crashes
         while True:
             sleep_until_next_candle()
 

@@ -3,6 +3,7 @@ import csv
 def WriteOutTrades(df):
     """Writes out the trades to CSV file. Writes header only if file does not exist."""
 
+    #Check if file exists
     file_exists = os.path.isfile("data/dataLogs/TradeOnly.csv")
 
     with open("data_log.csv", "a", newline="") as csv_file:

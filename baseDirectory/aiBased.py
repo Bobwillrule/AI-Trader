@@ -44,6 +44,9 @@ def notify_discord(message):
 
 
 def normalizeOHLC(df):
+    """
+    Normalizes the function to -1, 1 to make sure that it works
+    """
     #  convert to numeric first
     for col in ["open", "high", "low", "close"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
